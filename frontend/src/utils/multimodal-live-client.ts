@@ -79,11 +79,6 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
   private runId: string;
   private userId?: string;
   private firstContentSent: boolean = false;
-  private audioChunksSent: number = 0;
-  private lastAudioSendTime: number = 0;
-  private readonly INITIAL_SEND_INTERVAL_MS = 300; // Start slow: 300ms between chunks
-  private readonly NORMAL_SEND_INTERVAL_MS = 125; // Normal rate: 125ms (8 chunks/sec)
-  private readonly RAMPUP_CHUNKS = 10; // Number of chunks to send at reduced rate
 
   constructor({ url, userId, runId }: MultimodalLiveAPIClientConnection) {
     super();
@@ -118,8 +113,6 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
 
     // Reset connection state
     this.firstContentSent = false;
-    this.audioChunksSent = 0;
-    this.lastAudioSendTime = 0;
 
     ws.addEventListener("message", async (evt: MessageEvent) => {
       if (evt.data instanceof Blob) {
@@ -405,43 +398,13 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
     let hasVideo = false;
     for (let i = 0; i < chunks.length; i++) {
       const ch = chunks[i];
-      if (ch.mimeType.includes("audio")) {
-        hasAudio = true;
-      }
-      if (ch.mimeType.includes("image")) {
-        hasVideo = true;
-      }
-      if (hasAudio && hasVideo) {
-        break;
-      }
-    }
-
-    // Throttle audio chunks during initial connection phase
-    if (hasAudio && !hasVideo) {
-      const now = Date.now();
-
-      // Calculate required interval based on how many chunks we've sent
-      const requiredInterval = this.audioChunksSent < this.RAMPUP_CHUNKS
-        ? this.INITIAL_SEND_INTERVAL_MS
-        : this.NORMAL_SEND_INTERVAL_MS;
-
-      // If not enough time has passed since last send, drop this chunk
-      if (this.lastAudioSendTime > 0 && (now - this.lastAudioSendTime) < requiredInterval) {
-        return;
-      }
-
-      this.lastAudioSendTime = now;
-      this.audioChunksSent++;
+      if (ch.mimeType.includes("audio")) hasAudio = true;
+      if (ch.mimeType.includes("image")) hasVideo = true;
+      if (hasAudio && hasVideo) break;
     }
 
     const message =
-      hasAudio && hasVideo
-        ? "audio + video"
-        : hasAudio
-          ? "audio"
-          : hasVideo
-            ? "video"
-            : "unknown";
+      hasAudio && hasVideo ? "audio + video" : hasAudio ? "audio" : hasVideo ? "video" : "unknown";
 
     // Convert to LiveRequest format for backend
     for (const chunk of chunks) {
