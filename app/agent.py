@@ -21,6 +21,13 @@ from google.genai import types
 import json
 import os
 
+# Load .env before checking for API keys
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 # Use Gemini API key if set, otherwise fall back to Vertex AI
 if os.environ.get("GOOGLE_API_KEY"):
     os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "False"

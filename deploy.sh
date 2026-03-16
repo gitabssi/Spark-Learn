@@ -5,7 +5,8 @@ set -e
 PROJECT_ID="gen-lang-client-0979872677"
 REGION="us-central1"
 SERVICE="sparklive"
-GOOGLE_API_KEY="AIzaSyC-sSEOjXD1hWDpwT_swjWutZUMRMusZ3E"
+# Pass your key: GOOGLE_API_KEY=your_key ./deploy.sh
+GOOGLE_API_KEY="${GOOGLE_API_KEY:?ERROR: set GOOGLE_API_KEY before running this script}"
 GCLOUD_DIR="$HOME/.spark-gcloud/google-cloud-sdk"
 
 # ─── Install gcloud (standalone, no Xcode CLT needed) ─────────────────────────

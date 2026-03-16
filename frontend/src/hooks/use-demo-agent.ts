@@ -79,8 +79,13 @@ export function useDemoAgent(
     /**
      * speakAsStudent — sends a line to the student Gemini Live session,
      * streams the Leda audio, and resolves only after all audio has played.
+     * Never throws — if the student WS is unavailable, resolves immediately.
      */
     const speakAsStudent = (text: string): Promise<void> => {
+      // If the student WebSocket is gone, skip TTS and continue the demo
+      if (!studentClient.ws || studentClient.ws.readyState !== WebSocket.OPEN) {
+        return Promise.resolve();
+      }
       return new Promise<void>((resolve) => {
         let resolved = false;
         const done = () => {
@@ -104,7 +109,14 @@ export function useDemoAgent(
         };
 
         studentClient.on("turncomplete", onTurnComplete);
-        studentClient.send([{ text }]);
+        try {
+          studentClient.send([{ text }]);
+        } catch (e) {
+          // WebSocket closed between the check and the send — skip TTS
+          clearTimeout(timeout);
+          studentClient.off("turncomplete", onTurnComplete);
+          resolve();
+        }
       });
     };
 
@@ -140,10 +152,8 @@ export function useDemoAgent(
       await waitForEvent(client, "turncomplete", 28_000);
       await sleep(700);
 
-      // ── 3. Draw the right triangle — slowly, hesitantly ───────────────────
-      await speakAsStudent(
-        "Ok so... I drew this triangle. It's supposed to be a right triangle.",
-      );
+      // ── 3. Draw the triangle FIRST (silent, thinking) ─────────────────────
+      // Student draws quietly while SPARK watches — then explains what they drew
 
       await draw([{ type: "line", x1: 0.08, y1: 0.68, x2: 0.44, y2: 0.68, duration: 1000 }]);
       await sleep(350);
@@ -157,26 +167,26 @@ export function useDemoAgent(
         { type: "line", x1: 0.44, y1: 0.62, x2: 0.38, y2: 0.62, duration: 200 },
         { type: "line", x1: 0.38, y1: 0.62, x2: 0.38, y2: 0.68, duration: 200 },
       ]);
-      await sleep(500);
+      await sleep(400);
 
       // Labels
       await draw([{ type: "text", text: "a = 3", x: 0.22, y: 0.71, fontSize: 20, duration: 380 }]);
-      await sleep(180);
+      await sleep(150);
       await draw([{ type: "text", text: "b = 4", x: 0.46, y: 0.44, fontSize: 20, duration: 380 }]);
-      await sleep(180);
+      await sleep(150);
       await draw([{ type: "text", text: "c = ?", x: 0.17, y: 0.36, fontSize: 20, duration: 380 }]);
-      await sleep(600);
+      await sleep(500);
 
-      // ── 4. Explain the problem ─────────────────────────────────────────────
+      // NOW the student speaks about what they drew
       await speakAsStudent(
-        "The sides are a equals 3 and b equals 4. And I have to find c. My teacher said something about a squared plus b squared equals c squared but... I don't really get what that means.",
+        "Ok so... I drew this right triangle. The sides are a equals 3 and b equals 4, and I have to find c. My teacher said something about a squared plus b squared equals c squared but... I don't really get what that means.",
       );
       client.send([
         {
           text: "The sides are a equals 3 and b equals 4. I have to find c. My teacher said a² plus b² equals c² but I don't really understand what that means or how to use it.",
         },
       ]);
-      await waitForEvent(client, "turncomplete", 30_000);
+      await waitForEvent(client, "turncomplete", 32_000);
       await sleep(900);
 
       // ── 5. Classic mistake ─────────────────────────────────────────────────

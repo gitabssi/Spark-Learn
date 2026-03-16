@@ -317,15 +317,19 @@ async def student_tts_websocket(websocket: WebSocket) -> None:
         ),
     )
 
+    # ── Handshake FIRST — before any Gemini Live connection ──────────────────
+    try:
+        await websocket.receive_json()                   # consume client setup msg
+        await websocket.send_json({"setupComplete": {}}) # immediately confirm ready
+    except Exception:
+        return
+
+    # ── Now connect to Gemini Live ─────────────────────────────────────────────
     try:
         async with genai_client.aio.live.connect(
             model="gemini-2.5-flash-native-audio-preview-12-2025",
             config=live_config,
         ) as live_session:
-            # Wait for the client's setup handshake, then confirm ready
-            await websocket.receive_json()
-            await websocket.send_json({"setupComplete": {}})
-
             while True:
                 try:
                     msg = await websocket.receive_json()
@@ -336,30 +340,37 @@ async def student_tts_websocket(websocket: WebSocket) -> None:
                 if not text:
                     continue
 
-                # Send text to Gemini Live → receive audio
-                await live_session.send(input=text, end_of_turn=True)
-
-                async for response in live_session.receive():
-                    if response.data:
-                        audio_b64 = base64.b64encode(response.data).decode()
-                        await websocket.send_json({
-                            "serverContent": {
-                                "modelTurn": {
-                                    "parts": [{
-                                        "inlineData": {
-                                            "mimeType": "audio/pcm;rate=24000",
-                                            "data": audio_b64,
-                                        }
-                                    }]
+                # TTS this line and stream audio back
+                try:
+                    await live_session.send(input=text, end_of_turn=True)
+                    async for response in live_session.receive():
+                        if response.data:
+                            audio_b64 = base64.b64encode(response.data).decode()
+                            await websocket.send_json({
+                                "serverContent": {
+                                    "modelTurn": {
+                                        "parts": [{
+                                            "inlineData": {
+                                                "mimeType": "audio/pcm;rate=24000",
+                                                "data": audio_b64,
+                                            }
+                                        }]
+                                    }
                                 }
-                            }
-                        })
-                    if (
-                        response.server_content
-                        and getattr(response.server_content, "turn_complete", False)
-                    ):
+                            })
+                        if (
+                            response.server_content
+                            and getattr(response.server_content, "turn_complete", False)
+                        ):
+                            await websocket.send_json({"serverContent": {"turnComplete": True}})
+                            break
+                except Exception as inner_e:
+                    logging.error(f"Student TTS utterance error: {inner_e}")
+                    try:
                         await websocket.send_json({"serverContent": {"turnComplete": True}})
-                        break
+                    except Exception:
+                        pass
+                    break
 
     except Exception as e:
         logging.error(f"Student TTS WS error: {e}")
