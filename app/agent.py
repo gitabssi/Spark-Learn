@@ -350,6 +350,13 @@ root_agent = Agent(
         model="gemini-2.5-flash-native-audio-preview-12-2025",
         retry_options=types.HttpRetryOptions(attempts=3),
     ),
+    generate_content_config=types.GenerateContentConfig(
+        speech_config=types.SpeechConfig(
+            voice_config=types.VoiceConfig(
+                prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Callirrhoe")
+            )
+        )
+    ),
     instruction=SPARK_SYSTEM_PROMPT,
     tools=[
         highlight_canvas_area,

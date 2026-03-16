@@ -26,6 +26,19 @@ import "./spark-canvas.scss";
 
 export type DrawTool = "pen" | "eraser" | "highlight";
 
+// ─── Demo drawing types ───────────────────────────────────────────────────────
+
+export interface DemoDrawItem {
+  type: "line" | "text";
+  // line
+  x1?: number; y1?: number; x2?: number; y2?: number;
+  // text
+  text?: string; x?: number; y?: number; fontSize?: number;
+  // shared
+  color?: string;
+  duration?: number; // ms to animate
+}
+
 export interface SparkCanvasProps {
   canvasTools: CanvasToolsState;
   activeTool: DrawTool;
@@ -40,6 +53,7 @@ export interface SparkCanvasRef {
   clearStudentCanvas: () => void;
   getStudentCanvasData: () => string;
   captureFrame: () => string | null;
+  drawStudentContent: (items: DemoDrawItem[]) => Promise<void>;
 }
 
 // ─── Handwriting font helpers ─────────────────────────────────────────────────
@@ -171,6 +185,73 @@ function HighlightOverlay({ highlight, canvasWidth, canvasHeight }: {
   );
 }
 
+// ─── Demo: human-like drawing helpers ─────────────────────────────────────────
+
+async function demoAnimateLine(ctx: CanvasRenderingContext2D, item: DemoDrawItem, W: number, H: number) {
+  const x1 = item.x1! * W, y1 = item.y1! * H;
+  const x2 = item.x2! * W, y2 = item.y2! * H;
+  const duration = item.duration ?? 800;
+  const steps = Math.max(12, Math.floor(duration / 18));
+  const stepDelay = duration / steps;
+  const jitter = 1.8;
+
+  ctx.strokeStyle = item.color ?? "#F3F0FF";
+  ctx.lineWidth = 2.8;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  let prevX = x1 + (Math.random() - 0.5) * jitter;
+  let prevY = y1 + (Math.random() - 0.5) * jitter;
+  ctx.beginPath();
+  ctx.moveTo(prevX, prevY);
+
+  for (let i = 1; i <= steps; i++) {
+    await new Promise<void>((r) => setTimeout(r, stepDelay));
+    const t = i / steps;
+    // ease-in-out for natural deceleration
+    const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    const nx = x1 + (x2 - x1) * eased + (Math.random() - 0.5) * jitter;
+    const ny = y1 + (y2 - y1) * eased + (Math.random() - 0.5) * jitter;
+    ctx.lineTo(nx, ny);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(nx, ny);
+    prevX = nx; prevY = ny;
+  }
+}
+
+async function demoAnimateText(ctx: CanvasRenderingContext2D, item: DemoDrawItem, W: number, H: number) {
+  const text = item.text ?? "";
+  const x = item.x! * W;
+  const y = item.y! * H;
+  const fontSize = item.fontSize ?? 22;
+  const totalDuration = item.duration ?? text.length * 55;
+  const charDelay = totalDuration / Math.max(1, text.length);
+
+  ctx.font = `600 ${fontSize}px ${HANDWRITING_FONT}`;
+  ctx.fillStyle = item.color ?? "#F3F0FF";
+  ctx.textBaseline = "top";
+
+  let xOffset = 0;
+  for (const char of text) {
+    ctx.save();
+    // slight per-character rotation for human feel
+    const rot = (Math.random() - 0.5) * 0.06;
+    ctx.translate(x + xOffset + fontSize * 0.3, y + fontSize * 0.5);
+    ctx.rotate(rot);
+    ctx.translate(-(x + xOffset + fontSize * 0.3), -(y + fontSize * 0.5));
+    ctx.font = `600 ${fontSize}px ${HANDWRITING_FONT}`;
+    ctx.fillStyle = item.color ?? "#F3F0FF";
+    ctx.textBaseline = "top";
+    ctx.fillText(char, x + xOffset, y);
+    ctx.restore();
+    xOffset += ctx.measureText(char).width;
+    await new Promise<void>((r) =>
+      setTimeout(r, charDelay * (0.7 + Math.random() * 0.6))
+    );
+  }
+}
+
 // ─── Main SparkCanvas Component ───────────────────────────────────────────────
 
 const SparkCanvas = forwardRef<SparkCanvasRef, SparkCanvasProps>(
@@ -195,6 +276,18 @@ const SparkCanvas = forwardRef<SparkCanvasRef, SparkCanvasProps>(
         if (canvas) canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
       },
       getStudentCanvasData: () => studentCanvasRef.current?.toDataURL("image/png") ?? "",
+      drawStudentContent: async (items: DemoDrawItem[]) => {
+        const canvas = studentCanvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d")!;
+        for (const item of items) {
+          if (item.type === "line") {
+            await demoAnimateLine(ctx, item, canvas.width, canvas.height);
+          } else if (item.type === "text") {
+            await demoAnimateText(ctx, item, canvas.width, canvas.height);
+          }
+        }
+      },
       captureFrame: () => {
         // Composite student + spark layers for AI vision
         const sc = studentCanvasRef.current;

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -27,6 +28,8 @@ except ImportError:
     pass
 
 import backoff
+import google.genai as genai
+from google.genai import types
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -272,6 +275,99 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     await websocket.accept()
     connect_and_run = get_connect_and_run_callable(websocket)
     await connect_and_run()
+
+
+def _extract_text(msg: dict) -> str | None:
+    """Extract text from frontend message (handles ADK wrapping formats)."""
+    if "live_request" in msg:
+        return _extract_text(msg["live_request"])
+    if "content" in msg:
+        for part in (msg["content"].get("parts") or []):
+            if "text" in part:
+                return part["text"]
+    return None
+
+
+@app.websocket("/ws/student")
+async def student_tts_websocket(websocket: WebSocket) -> None:
+    """TTS-only Gemini Live endpoint for the demo student voice (Leda)."""
+    await websocket.accept()
+
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        await websocket.close()
+        return
+
+    genai_client = genai.Client(api_key=api_key)
+    live_config = types.LiveConnectConfig(
+        response_modalities=["AUDIO"],
+        speech_config=types.SpeechConfig(
+            voice_config=types.VoiceConfig(
+                prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Leda")
+            )
+        ),
+        system_instruction=types.Content(
+            parts=[types.Part(
+                text=(
+                    "You are Alex, a shy and curious 10-year-old student doing math homework. "
+                    "When the user gives you a line to speak, deliver it verbatim in a natural, "
+                    "child-like voice. Do not add extra words."
+                )
+            )]
+        ),
+    )
+
+    try:
+        async with genai_client.aio.live.connect(
+            model="gemini-2.5-flash-native-audio-preview-12-2025",
+            config=live_config,
+        ) as live_session:
+            # Wait for the client's setup handshake, then confirm ready
+            await websocket.receive_json()
+            await websocket.send_json({"setupComplete": {}})
+
+            while True:
+                try:
+                    msg = await websocket.receive_json()
+                except Exception:
+                    break
+
+                text = _extract_text(msg)
+                if not text:
+                    continue
+
+                # Send text to Gemini Live → receive audio
+                await live_session.send(input=text, end_of_turn=True)
+
+                async for response in live_session.receive():
+                    if response.data:
+                        audio_b64 = base64.b64encode(response.data).decode()
+                        await websocket.send_json({
+                            "serverContent": {
+                                "modelTurn": {
+                                    "parts": [{
+                                        "inlineData": {
+                                            "mimeType": "audio/pcm;rate=24000",
+                                            "data": audio_b64,
+                                        }
+                                    }]
+                                }
+                            }
+                        })
+                    if (
+                        response.server_content
+                        and getattr(response.server_content, "turn_complete", False)
+                    ):
+                        await websocket.send_json({"serverContent": {"turnComplete": True}})
+                        break
+
+    except Exception as e:
+        logging.error(f"Student TTS WS error: {e}")
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass
 
 
 @app.get("/health")

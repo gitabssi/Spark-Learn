@@ -82,9 +82,19 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
 
   constructor({ url, userId, runId }: MultimodalLiveAPIClientConnection) {
     super();
-    const defaultWsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+    const defaultWsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/`;
     url = url || defaultWsUrl;
-    this.url = new URL("ws", url).href;
+    // If the URL already has a non-root path (e.g. /ws/student), use it directly.
+    // Otherwise append /ws for the default endpoint.
+    try {
+      const httpUrl = url.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
+      const { pathname } = new URL(httpUrl);
+      this.url = (pathname === '/' || pathname === '')
+        ? url.replace(/\/$/, '') + '/ws'
+        : url;
+    } catch {
+      this.url = new URL("ws", url).href;
+    }
     this.userId = userId;
     this.runId = runId || crypto.randomUUID(); // Ensure runId is always a string by providing default
     this.send = this.send.bind(this);

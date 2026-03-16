@@ -5,7 +5,7 @@ set -e
 PROJECT_ID="gen-lang-client-0979872677"
 REGION="us-central1"
 SERVICE="sparklive"
-GOOGLE_API_KEY="AIzaSyDK_cvZnTQwlactw5hQ0Pnw-6GUiKNSvmo"
+GOOGLE_API_KEY="AIzaSyC-sSEOjXD1hWDpwT_swjWutZUMRMusZ3E"
 GCLOUD_DIR="$HOME/.spark-gcloud/google-cloud-sdk"
 
 # ─── Install gcloud (standalone, no Xcode CLT needed) ─────────────────────────

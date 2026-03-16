@@ -16,6 +16,7 @@ import { useWebcam } from "./hooks/use-webcam";
 import { useScreenCapture } from "./hooks/use-screen-capture";
 import { UseMediaStreamResult } from "./hooks/use-media-stream-mux";
 import TranscriptionPreview from "./components/transcription-preview/TranscriptionPreview";
+import { useDemoAgent } from "./hooks/use-demo-agent";
 
 // In Vite dev mode (port 3000), proxy handles /ws → backend:8000
 // In production (served by backend), connect directly to same host
@@ -56,6 +57,9 @@ function SparkApp({ userId }: { userId: string }) {
   const onStall = useCallback(() => {
     if (connected) client.send([{ text: "__proactive_stall_checkin__" }]);
   }, [connected, client]);
+
+  // Demo agent (passes setMuted so it can silence the real mic during playback)
+  const { startDemo, isDemoRunning } = useDemoAgent(client, connected, connect, canvasRef, setMuted);
 
   // Proactive monitor (silence / stall detection)
   const proactiveMonitor = useProactiveMonitor(connected, onSilence, onStall);
@@ -193,6 +197,17 @@ function SparkApp({ userId }: { userId: string }) {
             onEraseActivity={recordEraseActivity}
             className="spark-main-canvas"
           />
+
+          {/* Demo button — only shown when idle and not yet connected */}
+          {!connected && !isDemoRunning && (
+            <div className="spark-demo-overlay">
+              <button className="spark-demo-btn" onClick={startDemo}>
+                <span className="spark-demo-btn__icon">🎬</span>
+                <span className="spark-demo-btn__text">Watch Live Demo</span>
+                <span className="spark-demo-btn__sub">See SPARK tutor a student in real time · ~3 min</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* SPARK presence sidebar */}
