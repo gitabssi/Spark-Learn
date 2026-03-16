@@ -1,64 +1,252 @@
 /**
- * Copyright 2024 Google LLC
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPARK — AI Tutoring System
+ * Main application layout: Header | Canvas + Presence | Toolbar
  */
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.scss";
-import { LiveAPIProvider } from "./contexts/LiveAPIContext";
-import SidePanel from "./components/side-panel/SidePanel";
-import cn from "classnames";
+import { LiveAPIProvider, useLiveAPIContext } from "./contexts/LiveAPIContext";
+import SparkCanvas, { DrawTool, SparkCanvasRef } from "./components/spark-canvas/SparkCanvas";
+import SparkPresence from "./components/spark-presence/SparkPresence";
+import SparkToolbar from "./components/spark-toolbar/SparkToolbar";
+import { useCanvasTools } from "./hooks/use-canvas-tools";
+import { useProactiveMonitor } from "./hooks/use-proactive-monitor";
+import { AudioRecorder } from "./utils/audio-recorder";
+import { useWebcam } from "./hooks/use-webcam";
+import { useScreenCapture } from "./hooks/use-screen-capture";
+import { UseMediaStreamResult } from "./hooks/use-media-stream-mux";
+import TranscriptionPreview from "./components/transcription-preview/TranscriptionPreview";
 
-// In development mode (frontend on :8501), connect to backend on :8000
-const isDevelopment = window.location.port === '8501';
-const defaultHost = isDevelopment ? `${window.location.hostname}:8000` : window.location.host;
-const defaultUri = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${defaultHost}/`;
+// In Vite dev mode (port 3000), proxy handles /ws → backend:8000
+// In production (served by backend), connect directly to same host
+const defaultUri = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/`;
 
-function App() {
+// ─── Inner app (needs LiveAPIContext) ─────────────────────────────────────────
+
+function SparkApp({ userId }: { userId: string }) {
+  const { connected, client, connect, disconnect, volume } = useLiveAPIContext();
+
+  const canvasRef = useRef<SparkCanvasRef>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
-  const [serverUrl, setServerUrl] = useState<string>(defaultUri);
-  const [userId, setUserId] = useState<string>("user1");
+  const renderCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [audioRecorder] = useState(() => new AudioRecorder());
+
+  // Drawing state
+  const [activeTool, setActiveTool] = useState<DrawTool>("pen");
+  const [penColor, setPenColor] = useState("#F3F0FF");
+  const [penSize, setPenSize] = useState(3);
+
+  // Mic state
+  const [muted, setMuted] = useState(false);
+  const [inputVolume, setInputVolume] = useState(0);
+
+  // Video streams
+  const webcam = useWebcam();
+  const screenCapture = useScreenCapture();
+  const [activeVideoStream, setActiveVideoStream] = useState<MediaStream | null>(null);
+  const videoStreams = [webcam, screenCapture];
+
+  // Canvas tool listener (processes AI tool calls → visual effects)
+  const canvasTools = useCanvasTools(client);
+
+  const onSilence = useCallback(() => {
+    if (connected) client.send([{ text: "__proactive_silence_checkin__" }]);
+  }, [connected, client]);
+
+  const onStall = useCallback(() => {
+    if (connected) client.send([{ text: "__proactive_stall_checkin__" }]);
+  }, [connected, client]);
+
+  // Proactive monitor (silence / stall detection)
+  const proactiveMonitor = useProactiveMonitor(connected, onSilence, onStall);
+  const { resetSilenceTimer, recordDrawActivity, recordEraseActivity, isSilent, isStalling } = proactiveMonitor;
+
+  // ─── Audio recording ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const onData = (base64: string) => {
+      client.sendRealtimeInput([{ mimeType: "audio/pcm;rate=16000", data: base64 }]);
+      resetSilenceTimer();
+    };
+    const onVolume = (v: number) => setInputVolume(v);
+
+    if (connected && !muted) {
+      audioRecorder.on("data", onData).on("volume", onVolume).start();
+    } else {
+      audioRecorder.stop();
+      setInputVolume(0);
+    }
+
+    return () => {
+      audioRecorder.off("data", onData).off("volume", onVolume);
+    };
+  }, [connected, muted, client, audioRecorder, resetSilenceTimer]);
+
+  // ─── Video streaming ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.srcObject = activeVideoStream;
+    }
+
+    let timeoutId = -1;
+
+    function sendVideoFrame() {
+      const video = videoRef.current;
+      const canvas = renderCanvasRef.current;
+      if (!video || !canvas) return;
+
+      const ctx = canvas.getContext("2d")!;
+      canvas.width = video.videoWidth * 0.25;
+      canvas.height = video.videoHeight * 0.25;
+      if (canvas.width + canvas.height > 0) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const base64 = canvas.toDataURL("image/jpeg", 0.8);
+        const data = base64.slice(base64.indexOf(",") + 1);
+        client.sendRealtimeInput([{ mimeType: "image/jpeg", data }]);
+      }
+      if (connected) {
+        timeoutId = window.setTimeout(sendVideoFrame, 2000);
+      }
+    }
+
+    if (connected && activeVideoStream) {
+      requestAnimationFrame(sendVideoFrame);
+    }
+
+    return () => clearTimeout(timeoutId);
+  }, [connected, activeVideoStream, client]);
+
+  // ─── Periodic canvas frame to AI vision ──────────────────────────────────
+  useEffect(() => {
+    if (!connected) return;
+    const interval = setInterval(() => {
+      const data = canvasRef.current?.captureFrame();
+      if (data) {
+        client.sendRealtimeInput([{ mimeType: "image/jpeg", data }]);
+      }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [connected, client]);
+
+  // ─── Stream switcher ──────────────────────────────────────────────────────
+  const changeStreams = (next?: UseMediaStreamResult) => async () => {
+    if (next) {
+      const stream = await next.start();
+      setActiveVideoStream(stream);
+    } else {
+      setActiveVideoStream(null);
+    }
+    videoStreams.filter((s) => s !== next).forEach((s) => s.stop());
+  };
 
   return (
-    <div className="App">
-      <LiveAPIProvider url={serverUrl} userId={userId}>
-        <div className="streaming-console">
-          <SidePanel
-            videoRef={videoRef}
-            supportsVideo={true}
-            onVideoStreamChange={setVideoStream}
-            serverUrl={serverUrl}
-            userId={userId}
-            onServerUrlChange={setServerUrl}
-            onUserIdChange={setUserId}
-          />
-          <main>
-            <div className="main-app-area">
-              <video
-                className={cn("stream", {
-                  hidden: !videoRef.current || !videoStream,
-                })}
-                ref={videoRef}
-                autoPlay
-                playsInline
-              />
+    <div className="spark-app">
+      {/* Hidden canvases */}
+      <canvas ref={renderCanvasRef} style={{ display: "none" }} />
+      <video ref={videoRef} autoPlay playsInline style={{ display: "none" }} />
+
+      {/* ── Header ── */}
+      <header className="spark-header">
+        <div className="spark-header__brand">
+          <span className="spark-header__logo">✦</span>
+          <span className="spark-header__name">SPARK</span>
+          {canvasTools.sessionContext && (
+            <div className="spark-header__session">
+              <span className="spark-header__subject">
+                {canvasTools.sessionContext.subject}
+              </span>
+              <span className="spark-header__topic">
+                {canvasTools.sessionContext.topic}
+              </span>
+              <span
+                className={`spark-header__difficulty spark-header__difficulty--${canvasTools.sessionContext.difficulty}`}
+              >
+                {canvasTools.sessionContext.difficulty}
+              </span>
             </div>
-          </main>
+          )}
         </div>
-      </LiveAPIProvider>
+        <div className="spark-header__right">
+          {connected && (
+            <div className="spark-header__status">
+              <span className="spark-header__status-dot" />
+              Live Session
+            </div>
+          )}
+          <div className="spark-header__user">
+            <span className="material-symbols-outlined">person</span>
+            {userId}
+          </div>
+        </div>
+      </header>
+
+      {/* ── Main area ── */}
+      <main className="spark-main">
+        {/* Canvas area */}
+        <div className="spark-canvas-area">
+          <SparkCanvas
+            ref={canvasRef}
+            canvasTools={canvasTools}
+            activeTool={activeTool}
+            penColor={penColor}
+            penSize={penSize}
+            onDrawActivity={recordDrawActivity}
+            onEraseActivity={recordEraseActivity}
+            className="spark-main-canvas"
+          />
+        </div>
+
+        {/* SPARK presence sidebar */}
+        <aside className="spark-sidebar">
+          <SparkPresence
+            volume={volume}
+            connected={connected}
+            isSilent={isSilent}
+            isStalling={isStalling}
+            sessionTopic={canvasTools.sessionContext?.topic}
+            sessionSubject={canvasTools.sessionContext?.subject}
+          />
+          <div className="spark-transcription-wrap">
+            <TranscriptionPreview open={true} />
+          </div>
+        </aside>
+      </main>
+
+      {/* ── Bottom toolbar ── */}
+      <footer className="spark-footer">
+        <SparkToolbar
+          connected={connected}
+          onConnect={connect}
+          onDisconnect={disconnect}
+          activeTool={activeTool}
+          onToolChange={setActiveTool}
+          penColor={penColor}
+          onColorChange={setPenColor}
+          penSize={penSize}
+          onSizeChange={setPenSize}
+          onClearCanvas={() => canvasRef.current?.clearStudentCanvas()}
+          muted={muted}
+          onToggleMute={() => setMuted((m) => !m)}
+          webcam={webcam}
+          screenCapture={screenCapture}
+          onChangeStream={changeStreams}
+          inputVolume={inputVolume}
+          outputVolume={volume}
+        />
+      </footer>
     </div>
+  );
+}
+
+// ─── Root wrapper ──────────────────────────────────────────────────────────────
+
+function App() {
+  const [serverUrl] = useState(defaultUri);
+  const [userId] = useState("student");
+
+  return (
+    <LiveAPIProvider url={serverUrl} userId={userId}>
+      <SparkApp userId={userId} />
+    </LiveAPIProvider>
   );
 }
 

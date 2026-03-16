@@ -1,0 +1,291 @@
+/* stylelint-disable */
+
+.spark-canvas-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--spark-canvas-bg, #1A1530);
+  box-shadow:
+    0 0 0 1px rgba(124, 58, 237, 0.15),
+    0 8px 40px rgba(0, 0, 0, 0.4);
+}
+
+// ─── Canvas Layers ────────────────────────────────────────────────────────────
+
+.spark-canvas-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.spark-canvas-layer--student {
+  z-index: 1;
+  touch-action: none;
+  background: var(--spark-canvas-surface, #161228);
+
+  &.spark-canvas-cursor--pen {
+    cursor: crosshair;
+  }
+
+  &.spark-canvas-cursor--eraser {
+    cursor: cell;
+  }
+
+  &.spark-canvas-cursor--highlight {
+    cursor: text;
+  }
+}
+
+.spark-canvas-layer--spark-drawing {
+  z-index: 2;
+  pointer-events: none;
+}
+
+.spark-canvas-layer--highlights {
+  z-index: 3;
+  pointer-events: none;
+}
+
+.spark-canvas-layer--assets {
+  z-index: 4;
+  pointer-events: none;
+}
+
+// ─── SPARK Highlight Boxes ─────────────────────────────────────────────────────
+
+.spark-highlight {
+  position: absolute;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  animation: spark-highlight-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  pointer-events: none;
+
+  &__label {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    background: rgba(13, 11, 30, 0.9);
+    color: #F3F0FF;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(124, 58, 237, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+}
+
+@keyframes spark-highlight-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+// ─── Hint Cards ───────────────────────────────────────────────────────────────
+
+.spark-hint-card {
+  position: absolute;
+  pointer-events: all;
+  width: 280px;
+  background: rgba(22, 18, 40, 0.92);
+  border: 1px solid var(--card-accent, #A78BFA);
+  border-radius: 16px;
+  backdrop-filter: blur(20px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 24px -4px var(--card-accent, #A78BFA);
+  animation: card-float-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) var(--card-delay, 0ms) both;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.04) 0%,
+      transparent 60%
+    );
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  &__icon {
+    font-size: 18px;
+    color: var(--card-accent, #A78BFA);
+    flex-shrink: 0;
+  }
+
+  &__title {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: #F3F0FF;
+    letter-spacing: 0.01em;
+  }
+
+  &__close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: rgba(243, 240, 255, 0.4);
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+
+    &:hover {
+      color: #F3F0FF;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .material-symbols-outlined {
+      font-size: 16px;
+    }
+  }
+
+  &__content {
+    padding: 10px 14px 14px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: rgba(243, 240, 255, 0.85);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
+@keyframes card-float-in {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+// ─── Celebration Overlay ──────────────────────────────────────────────────────
+
+.spark-celebration {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 10;
+
+  &__message {
+    background: linear-gradient(135deg, #7C3AED, #FF8A65);
+    color: white;
+    font-size: 28px;
+    font-weight: 700;
+    padding: 20px 40px;
+    border-radius: 100px;
+    box-shadow: 0 8px 40px rgba(124, 58, 237, 0.5);
+    animation: celebrate-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    text-align: center;
+    letter-spacing: -0.01em;
+  }
+
+  &--large .spark-celebration__message {
+    font-size: 36px;
+    padding: 24px 48px;
+  }
+
+  &--small .spark-celebration__message {
+    font-size: 20px;
+    padding: 14px 28px;
+  }
+
+  &__particles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  &__particle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    top: -10px;
+    animation: particle-fall 1.2s ease-in forwards;
+  }
+}
+
+@keyframes celebrate-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.3) rotate(-8deg);
+  }
+  60% {
+    transform: scale(1.1) rotate(2deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes particle-fall {
+  0% {
+    top: -10px;
+    opacity: 1;
+    transform: translateX(0) rotate(0deg);
+  }
+  100% {
+    top: calc(100% + 10px);
+    opacity: 0;
+    transform: translateX(calc(var(--drift, 40px) * (var(--dir, 1) - 0.5) * 2)) rotate(720deg);
+  }
+}
+
+// ─── Empty Canvas Hint ────────────────────────────────────────────────────────
+
+.spark-canvas-empty-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: none;
+  opacity: 0.2;
+  z-index: 0;
+
+  .material-symbols-outlined {
+    font-size: 48px;
+    color: #A78BFA;
+  }
+
+  p {
+    color: #A78BFA;
+    font-size: 14px;
+    font-weight: 400;
+    margin: 0;
+    text-align: center;
+  }
+}

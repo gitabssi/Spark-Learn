@@ -1,0 +1,272 @@
+/* stylelint-disable */
+
+.spark-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: rgba(22, 18, 40, 0.85);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 100px;
+  backdrop-filter: blur(24px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 8px 32px rgba(0, 0, 0, 0.5);
+  position: relative;
+  flex-wrap: nowrap;
+}
+
+.spark-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  &--disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+}
+
+.spark-toolbar__divider {
+  width: 1px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.spark-toolbar__volume {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 24px;
+  margin-left: 4px;
+}
+
+// ─── Tool Buttons ─────────────────────────────────────────────────────────────
+
+.spark-tool-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: rgba(243, 240, 255, 0.5);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+  flex-shrink: 0;
+
+  .material-symbols-outlined {
+    font-size: 20px;
+  }
+
+  &:hover {
+    background: rgba(124, 58, 237, 0.15);
+    color: #F3F0FF;
+    transform: scale(1.08);
+  }
+
+  &--active {
+    background: rgba(124, 58, 237, 0.25);
+    color: #A78BFA;
+
+    &:hover {
+      background: rgba(124, 58, 237, 0.35);
+    }
+  }
+
+  &--accent {
+    background: rgba(255, 138, 101, 0.15);
+    color: #FF8A65;
+
+    &:hover {
+      background: rgba(255, 138, 101, 0.25);
+    }
+  }
+
+  &--color {
+    padding: 0;
+  }
+
+  &__color-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    display: block;
+    transition: border-color 0.15s;
+  }
+
+  &--color.spark-tool-btn--active &__color-dot {
+    border-color: #A78BFA;
+  }
+}
+
+// ─── Color Picker Popup ────────────────────────────────────────────────────────
+
+.spark-toolbar__color-wrap,
+.spark-toolbar__size-wrap {
+  position: relative;
+}
+
+.spark-color-picker {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px;
+  background: rgba(22, 18, 40, 0.95);
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  border-radius: 100px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: popup-in 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  white-space: nowrap;
+  z-index: 100;
+}
+
+@keyframes popup-in {
+  from { opacity: 0; transform: translateX(-50%) scale(0.8) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
+}
+
+.spark-color-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+
+  &:hover {
+    transform: scale(1.2);
+  }
+
+  &--active {
+    border-color: #F3F0FF;
+    transform: scale(1.15);
+  }
+}
+
+// ─── Size Picker Popup ─────────────────────────────────────────────────────────
+
+.spark-size-picker {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(22, 18, 40, 0.95);
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  border-radius: 16px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: popup-in 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  white-space: nowrap;
+  z-index: 100;
+  min-width: 140px;
+
+  &__label {
+    font-size: 11px;
+    color: rgba(243, 240, 255, 0.6);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  &__slider {
+    width: 120px;
+    accent-color: #7C3AED;
+    cursor: pointer;
+  }
+}
+
+// ─── Connect FAB ──────────────────────────────────────────────────────────────
+
+.spark-fab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 100px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  flex-shrink: 0;
+  white-space: nowrap;
+
+  &--disconnected {
+    background: linear-gradient(135deg, #7C3AED, #6D28D9);
+    color: white;
+    box-shadow: 0 4px 20px rgba(124, 58, 237, 0.5);
+
+    &:hover {
+      background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+      box-shadow: 0 6px 28px rgba(124, 58, 237, 0.65);
+      transform: scale(1.04);
+    }
+  }
+
+  &--connected {
+    background: linear-gradient(135deg, #FF8A65, #F97316);
+    color: white;
+    box-shadow: 0 4px 20px rgba(255, 138, 101, 0.45);
+
+    &:hover {
+      background: linear-gradient(135deg, #FFAB91, #FF8A65);
+      box-shadow: 0 6px 28px rgba(255, 138, 101, 0.6);
+      transform: scale(1.04);
+    }
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
+
+  &__icon {
+    font-size: 18px;
+  }
+
+  &__label {
+    font-family: "Space Grotesk", "Inter", sans-serif;
+  }
+}
+
+// ─── Volume Bars ───────────────────────────────────────────────────────────────
+
+.spark-volume-bar {
+  width: 4px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+
+  &__fill {
+    width: 100%;
+    border-radius: 2px;
+    transition: height 0.08s ease;
+
+    &--in {
+      background: #34D399;
+    }
+    &--out {
+      background: #FF8A65;
+    }
+  }
+}

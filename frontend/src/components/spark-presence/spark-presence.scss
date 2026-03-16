@@ -1,0 +1,151 @@
+/* stylelint-disable */
+
+.spark-presence {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 24px;
+  background: rgba(22, 18, 40, 0.6);
+  border: 1px solid rgba(124, 58, 237, 0.15);
+  backdrop-filter: blur(16px);
+  position: relative;
+  min-width: 140px;
+
+  // Emotional state variables
+  &--offline {
+    --blob-highlight: #404040;
+    --blob-primary: #2a2a2a;
+    --blob-shadow: #1a1a1a;
+    --glow-color: transparent;
+  }
+
+  &--idle {
+    --blob-highlight: #C4B5FD;
+    --blob-primary: #7C3AED;
+    --blob-shadow: #4C1D95;
+    --glow-color: rgba(124, 58, 237, 0.25);
+  }
+
+  &--speaking {
+    --blob-highlight: #FED7AA;
+    --blob-primary: #FF8A65;
+    --blob-shadow: #C2410C;
+    --glow-color: rgba(255, 138, 101, 0.3);
+    animation: presence-pulse 0.4s ease-in-out infinite alternate;
+  }
+
+  &--attentive {
+    --blob-highlight: #A7F3D0;
+    --blob-primary: #34D399;
+    --blob-shadow: #065F46;
+    --glow-color: rgba(52, 211, 153, 0.2);
+  }
+}
+
+@keyframes presence-pulse {
+  from { transform: scale(1); }
+  to   { transform: scale(1.03); }
+}
+
+.spark-presence__glow {
+  position: absolute;
+  inset: -20px;
+  background: radial-gradient(circle at center, var(--glow-color, transparent) 0%, transparent 70%);
+  pointer-events: none;
+  border-radius: 50%;
+  transition: background 0.6s ease;
+  animation: glow-breathe 3s ease-in-out infinite;
+}
+
+@keyframes glow-breathe {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.15); }
+}
+
+.spark-presence__svg {
+  width: 90px;
+  height: 90px;
+  filter: drop-shadow(0 4px 16px var(--glow-color, rgba(124, 58, 237, 0.4)));
+  transition: filter 0.4s ease;
+}
+
+.spark-presence__icon {
+  fill: rgba(255, 255, 255, 0.9);
+  font-style: normal;
+  animation: icon-spin 8s linear infinite;
+  transform-origin: 60px 60px;
+}
+
+@keyframes icon-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.spark-presence__label {
+  text-align: center;
+  min-height: 20px;
+}
+
+.spark-presence__status {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(243, 240, 255, 0.45);
+
+  &--speaking {
+    color: #FF8A65;
+    animation: text-pulse 0.5s ease-in-out infinite alternate;
+  }
+
+  &--attentive {
+    color: #34D399;
+  }
+
+  &--idle {
+    color: #A78BFA;
+  }
+}
+
+@keyframes text-pulse {
+  from { opacity: 0.7; }
+  to   { opacity: 1; }
+}
+
+.spark-presence__session {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px;
+  background: rgba(124, 58, 237, 0.15);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 10px;
+  animation: session-fade-in 0.4s ease both;
+}
+
+@keyframes session-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.spark-presence__session-subject {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #A78BFA;
+}
+
+.spark-presence__session-topic {
+  font-size: 11px;
+  font-weight: 500;
+  color: #F3F0FF;
+  text-align: center;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -19,8 +19,14 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 
+# Load .env file if present (for local development with API keys)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 import backoff
-import google.auth
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -30,9 +36,15 @@ from google.adk.artifacts import GcsArtifactService, InMemoryArtifactService
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
-from google.cloud import logging as google_cloud_logging
 from vertexai.agent_engines import _utils
 from websockets.exceptions import ConnectionClosedError
+
+# GCP Cloud Logging is optional — falls back to stdlib logging when not available
+try:
+    from google.cloud import logging as google_cloud_logging
+    _gcp_logging_client = google_cloud_logging.Client()
+except Exception:
+    _gcp_logging_client = None
 
 from .agent import app as adk_app
 from .app_utils.telemetry import setup_telemetry
@@ -57,12 +69,18 @@ if frontend_build_dir.exists():
         StaticFiles(directory=str(frontend_build_dir / "assets")),
         name="assets",
     )
-logging_client = google_cloud_logging.Client()
-logger = logging_client.logger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+# Use GCP structured logger when available, else a no-op shim
+if _gcp_logging_client:
+    logger = _gcp_logging_client.logger(__name__)
+else:
+    class _StdlibLogger:
+        def log_struct(self, data: dict, severity: str = "INFO") -> None:
+            logging.info(data)
+    logger = _StdlibLogger()
+
 setup_telemetry()
-_, project_id = google.auth.default()
 
 
 # Initialize ADK services
