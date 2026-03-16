@@ -58,23 +58,21 @@ build-frontend-if-needed:
 # Backend Deployment Targets
 # ==============================================================================
 
-# Deploy the agent remotely
-# Usage: make deploy [IAP=true] [PORT=8080] - Set IAP=true to enable Identity-Aware Proxy, PORT to specify container port
+# Deploy the agent to Cloud Run
+# Usage: make deploy GOOGLE_API_KEY=your_key
 deploy:
-	PROJECT_ID=$$(gcloud config get-value project) && \
-	gcloud beta run deploy sparklive \
+	@if [ -z "$(GOOGLE_API_KEY)" ]; then echo "❌  GOOGLE_API_KEY is required. Run: make deploy GOOGLE_API_KEY=your_key"; exit 1; fi
+	gcloud run deploy sparklive \
 		--source . \
 		--memory "4Gi" \
-		--project $$PROJECT_ID \
+		--project gen-lang-client-0979872677 \
 		--region "us-central1" \
-		--no-allow-unauthenticated \
+		--allow-unauthenticated \
 		--no-cpu-throttling \
+		--min-instances 1 \
 		--labels "created-by=adk" \
-		--update-build-env-vars "AGENT_VERSION=$(shell awk -F'"' '/^version = / {print $$2}' pyproject.toml || echo '0.0.0')" \
-		--update-env-vars \
-		"" \
-		$(if $(IAP),--iap) \
-		$(if $(PORT),--port=$(PORT))
+		--set-env-vars "GOOGLE_API_KEY=$(GOOGLE_API_KEY),GOOGLE_GENAI_USE_VERTEXAI=False" \
+		--update-build-env-vars "AGENT_VERSION=$(shell awk -F'"' '/^version = / {print $$2}' pyproject.toml || echo '0.0.0')"
 
 # Alias for 'make deploy' for backward compatibility
 backend: deploy
